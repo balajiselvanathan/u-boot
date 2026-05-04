@@ -954,6 +954,7 @@ static u64 set_one_region(u64 start, u64 size, u64 attrs, bool flag, int level)
 	 */
 	if (attrs == PTE_TYPE_FAULT && (pte_type(pte) == PTE_TYPE_FAULT || size >= levelsize)) {
 		*pte &= ~(PMD_ATTRMASK | PTE_TYPE_MASK);
+		*pte &= ~PMD_ATTRMASK;
 		return levelsize;
 	}
 
