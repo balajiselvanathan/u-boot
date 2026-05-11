@@ -14,6 +14,7 @@ Qualcomm
    iq8
    phones
    rdp
+   signing
    snagboot
 
 See also
