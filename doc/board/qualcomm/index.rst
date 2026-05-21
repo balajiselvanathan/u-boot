@@ -16,6 +16,7 @@ Qualcomm
    rdp
    signing
    snagboot
+   spl
 
 See also
 --------
