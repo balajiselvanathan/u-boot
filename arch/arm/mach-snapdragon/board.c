@@ -11,6 +11,7 @@
 #define pr_fmt(fmt) "QCOM: " fmt
 
 #include <asm/psci.h>
+#include <blk.h>
 #include <dm/ofnode.h>
 #include <env.h>
 #include <fdtdec.h>
@@ -18,10 +19,12 @@
 #include <init.h>
 #include <linux/arm-smccc.h>
 #include <linux/errno.h>
+#include <linux/kernel.h>
 #include <linux/psci.h>
 #include <linux/sizes.h>
 #include <lmb.h>
 #include <malloc.h>
+#include <part.h>
 #include <scsi.h>
 #include <soc/qcom/smem.h>
 #include <sort.h>
@@ -32,6 +35,11 @@
 
 enum qcom_boot_source qcom_boot_source __section(".data") = 0;
 enum qcom_memmap_source qcom_memmap_source __section(".data") = 0;
+
+#define GPT_PTE_SECTOR_SIZE	512
+#define GPT_PTE_BLOCKS \
+	DIV_ROUND_UP(CONFIG_EFI_PARTITION_ENTRIES_NUMBERS * GPT_ENTRY_SIZE, \
+		     GPT_PTE_SECTOR_SIZE)
 
 #if CONFIG_IS_ENABLED(SYSRESET_PSCI)
 static void show_psci_version(void)
@@ -162,6 +170,15 @@ int board_init(void)
 {
 #if CONFIG_IS_ENABLED(SYSRESET_PSCI)
 	show_psci_version();
+#endif
+	/*
+	 * Default cache only covers 8 blocks, too small for the GPT
+	 * partition-entry array, so it's never cached and gets re-read
+	 * and CRC-checked on every part_get_info() call. Raise the limit
+	 * to cache it after the first read.
+	 */
+#if CONFIG_IS_ENABLED(BLOCK_CACHE)
+	blkcache_configure(GPT_PTE_BLOCKS, 32);
 #endif
 	qcom_board_init();
 	return 0;
