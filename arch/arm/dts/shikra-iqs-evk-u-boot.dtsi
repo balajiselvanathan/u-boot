@@ -3,6 +3,8 @@
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
+#include "shikra-usb-u-boot.dtsi"
+
 / {
 	aliases {
 		mmc1 = &sdhc_2;
