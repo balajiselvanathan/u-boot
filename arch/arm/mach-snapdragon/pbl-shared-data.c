@@ -83,7 +83,7 @@ out:
 u32 __weak spl_boot_device(void)
 {
 	struct pbl_shared_data *psd = &g_psd;
-
+	if (CONFIG_IS_ENABLED(QCOM_BOOT_FROM_PBL)) {
 #ifdef DEBUG
 	for (int i  = 0; psd && i < psd->num_of_entries; i++) {
 		printf("entry[0x%x] = %d 0x%08x %d\n", i,
@@ -118,7 +118,7 @@ u32 __weak spl_boot_device(void)
 			return BOOT_DEVICE_UFS;
 		}
 	}
-
+	}
 out:
 	pr_err("No boot device configured\n");
 	return BOOT_DEVICE_NONE;
