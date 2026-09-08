@@ -15,6 +15,14 @@
 
 #include <dt-bindings/clock/qcom,nord-negcc.h>
 
+&xo_board_clk {
+	bootph-all;
+};
+
+&sleep_clk {
+	bootph-all;
+};
+
 / {
 	negcc: clock-controller@8900000 {
 		compatible = "qcom,nord-negcc";
@@ -22,6 +30,7 @@
 		#clock-cells = <1>;
 		#reset-cells = <1>;
 		#power-domain-cells = <1>;
+		bootph-all;
 	};
 
 	ufs_mem_phy: phy@1d40000 {
@@ -38,11 +47,13 @@
 		#phy-cells = <0>;
 
 		status = "okay";
+		bootph-all;
 	};
 
 	smem {
 		compatible = "qcom,smem";
 		memory-region = <&smem_region>;
+		bootph-all;
 	};
 
 	sram: sram@146d8000 {
@@ -71,7 +82,12 @@
 	smem_region: smem-region@89b00000 {
 		reg = <0x0 0x89b00000 0x0 0x400000>;
 		no-map;
+		bootph-all;
 	};
+};
+
+&tlmm {
+	bootph-all;
 };
 
 &ufs_mem_hc {
@@ -101,6 +117,8 @@
 
 	phys = <&ufs_mem_phy>;
 	phy-names = "ufsphy";
+
+	bootph-all;
 };
 
 &uart4 {
@@ -113,12 +131,14 @@
 	compatible = "qcom,sa8797p-geni-debug-uart",
 		     "qcom,sa8255p-geni-debug-uart",
 		     "qcom,geni-debug-uart";
+	bootph-all;
 };
 
 &qupv3_0 {
 	compatible = "qcom,sa8797p-geni-se-qup",
 		     "qcom,sa8255p-geni-se-qup",
 		     "qcom,geni-se-qup";
+	bootph-all;
 };
 
 &qupv3_1 {
