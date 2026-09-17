@@ -135,5 +135,11 @@ config QCOM_SNAGBOOT_MODE
 	  Platform-specific requirements:
 	  - Set CONFIG_COUNTER_FREQUENCY to match your platform's timer
 	  - Configure CONFIG_TEXT_BASE for U-Boot load address
+config QCOM_TMEL_ELF
+	string "TME Elf to concatenate with U-Boot SPL MBN image"
+	depends on SPL && QCOM_GENERATE_MBN
+	help
+	  Path of the TME Elf file to be concatenated to u-boot.mbn to create
+	  boot rom expected multi-elf image
 
 endif
