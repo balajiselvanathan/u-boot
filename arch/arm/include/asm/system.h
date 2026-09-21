@@ -330,6 +330,18 @@ void mmu_change_region_attr(phys_addr_t start, size_t size, u64 attrs);
  */
 void mmu_change_region_attr_nobreak(phys_addr_t addr, size_t size, u64 attrs);
 
+/**
+ * mmu_change_emerg_region_attr_nobreak() - like mmu_change_region_attr_nobreak(),
+ *                                          but applies the change to the emergency
+ *                                          page table (gd->arch.tlb_emerg) instead
+ *                                          of the primary one.
+ *
+ * @start: Start address of the region
+ * @size:  Size of the region
+ * @aatrs: New attributes
+ */
+void mmu_change_emerg_region_attr_nobreak(phys_addr_t addr, size_t size, u64 attrs);
+
 /*
  * smc_call() - issue a secure monitor call
  *

@@ -210,6 +210,21 @@ static void configure_reserved_memory(void)
 				start, start + size, attrs == PTE_TYPE_FAULT ? "FAULT" : "VALID");
 			/* No need to break-before-make since dcache is disabled */
 			mmu_change_region_attr_nobreak(start, size, attrs);
+			/*
+			 * Mirror the same attribute into the emergency page table.
+			 * mmu_map_region() (used later by SMEM/cmd-db/simplefb/etc.)
+			 * briefly switches TTBR0 to the emergency table while it
+			 * updates the primary one. If a reserved/no-map region (e.g.
+			 * a TZ/DARE carve-out) is only marked PTE_TYPE_FAULT in the
+			 * primary table, the emergency table still shows it as valid
+			 * memory during that window, so a stray/speculative access
+			 * during the switch can be translated as valid by the MMU
+			 * and reach the bus, where it then trips a hardware XPU
+			 * violation instead of being safely blocked by the MMU
+			 * itself. Applying the same FAULT marking here closes that
+			 * gap.
+			 */
+			mmu_change_emerg_region_attr_nobreak(start, size, attrs);
 			/* We have now mapped all the regions */
 			if (i == count)
 				break;
