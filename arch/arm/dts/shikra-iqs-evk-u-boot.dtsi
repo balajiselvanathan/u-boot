@@ -3,6 +3,7 @@
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
+#include "shikra-evk-u-boot.dtsi"
 #include "shikra-usb-u-boot.dtsi"
 
 / {
