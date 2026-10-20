@@ -1,5 +1,4 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
-
 #if defined(CONFIG_SPL_BUILD)
 #if defined(CONFIG_BOOT0_SDM845_WORKAROUND)
 #include "sdm845_spl_boot0.h"
@@ -9,8 +8,6 @@
 #else
 #if defined(CONFIG_BOOT0_MSM8916_PSCI_WORKAROUND)
 #include "msm8916_boot0.h"
-#elif defined(CONFIG_QCOM_EL2_GUNYAH_EXIT_SUPPORT)
-#include "gunyah_exit_boot0.h"
 #elif defined(CONFIG_QCOM_BOOT0_SNAGBOOT_MODE)
 #include "snagboot_boot0.h"
 #else
