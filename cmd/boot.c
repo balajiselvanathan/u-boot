@@ -60,11 +60,7 @@ U_BOOT_CMD(
 	reset, 2, 0,	do_reset,
 	"Perform RESET of the CPU",
 	"- cold boot without level specifier\n"
-	"reset -w - warm reset if implemented\n"
-#if IS_ENABLED(CONFIG_DM_REBOOT_MODE)
-	"reset -<mode> - reset into a mode declared in the device tree\n"
-	"reset -l - list the available reset modes\n"
-#endif
+	"reset -w - warm reset if implemented"
 );
 
 #ifdef CONFIG_CMD_POWEROFF
