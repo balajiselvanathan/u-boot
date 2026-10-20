@@ -186,11 +186,8 @@ int dm_reboot_mode_pre_probe(struct udevice *dev)
  * stage init.
  *
  * Called via EVT_LAST_STAGE_INIT, which fires after the environment is fully
- * initialized. Every reboot-mode device is offered the chance to update the
- * env variable from its backing store; trigger-only devices (e.g. the PSCI
- * backend, which has no get() op) return -ENOSYS and are skipped, so their
- * probe order relative to a backing-store device (nvmem/gpio/rtc) does not
- * matter.
+ * initialized.
+ *
  */
 static int reboot_mode_last_stage_init(void)
 {
@@ -200,13 +197,11 @@ static int reboot_mode_last_stage_init(void)
 	if (!CONFIG_IS_ENABLED(REBOOT_MODE_ENV_UPDATE))
 		return 0;
 
-	uclass_foreach_dev_probe(UCLASS_REBOOT_MODE, dev) {
-		ret = dm_reboot_mode_update(dev);
-		if (ret && ret != -ENOSYS)
-			dev_dbg(dev, "reboot-mode update failed: %d\n", ret);
-	}
+	ret = uclass_first_device_err(UCLASS_REBOOT_MODE, &dev);
+	if (ret)
+		return 0;
 
-	return 0;
+	return dm_reboot_mode_update(dev);
 }
 EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, reboot_mode_last_stage_init);
 
