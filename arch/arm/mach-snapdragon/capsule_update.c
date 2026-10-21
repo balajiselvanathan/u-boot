@@ -14,7 +14,6 @@
 #include <efi_loader.h>
 #include <malloc.h>
 #include <mmc.h>
-#include <scsi.h>
 #include <part.h>
 #include <linux/err.h>
 
@@ -631,7 +630,7 @@ void qcom_configure_capsule_updates(void)
 	u32 num_partitions;
 	struct udevice *dev;
 	bool have_ufs = false;
-	int i, ret;
+	int i;
 
 	memset(qcom_cands, 0, sizeof(qcom_cands));
 	for (i = 0; i < ARRAY_SIZE(qcom_image_map); i++) {
@@ -640,15 +639,6 @@ void qcom_configure_capsule_updates(void)
 		qcom_cands[i].slot[SLOT_B].part_num = -1;
 	}
 	memset(partitions, 0, sizeof(qcom_partitions));
-
-	if (IS_ENABLED(CONFIG_SCSI)) {
-		/* Scan for SCSI devices, unless already scanned earlier in boot */
-		ret = scsi_scan_new(false);
-		if (ret) {
-			debug("Failed to scan SCSI devices: %d\n", ret);
-			return;
-		}
-	}
 
 	/*
 	 * Check to see if we have UFS storage, if so firmware MUST be on it and
