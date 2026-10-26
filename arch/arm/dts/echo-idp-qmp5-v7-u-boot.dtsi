@@ -28,6 +28,21 @@
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
+
+	/*
+	 * The echo kernel's qcom-reboot-reason driver (qcom,reboot-reason
+	 * node, drivers/power/reset/qcom-reboot-reason.c) writes the PMIC
+	 * SDAM reboot-reason cell as (intent << 6) | reason, with bit 6 set
+	 * for intentional reboots such as `reboot bootloader`/`recovery`.
+	 * pmk8550.dtsi's mode-* values carry the bare reason codes (0x01/
+	 * 0x02), so they never match what Linux leaves in the cell (0x41/
+	 * 0x42) and the "reboot-mode" env var is never set. Match the
+	 * values with the intent bit included.
+	 */
+	reboot-mode {
+		mode-recovery = <0x41>;
+		mode-bootloader = <0x42>;
+	};
 };
 
 /*
