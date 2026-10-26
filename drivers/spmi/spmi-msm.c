@@ -8,6 +8,8 @@
  */
 
 #include <dm.h>
+#include <dm/lists.h>
+#include <dm/ofnode.h>
 #include <errno.h>
 #include <fdtdec.h>
 #include <asm/io.h>
@@ -379,9 +381,66 @@ static void msm_spmi_channel_map_v5(struct msm_spmi_priv *priv, unsigned int i,
 	/* else: Previous was writable and owned by us, this one isn't - keep previous */
 }
 
+/*
+ * Newer arbiters (v8, e.g. Echo) keep the bus registers ("cnfg", "intr",
+ * "chnl_owner") in a child node named "spmi" under the arbiter, and the
+ * PMICs are children of that node (see Linux spmi_pmic_arb_register_buses()).
+ * Legacy arbiters have everything in the arbiter node itself.
+ */
+static ofnode msm_spmi_bus_node(struct udevice *dev)
+{
+	ofnode node;
+
+	if (ofnode_stringlist_search(dev_ofnode(dev), "reg-names", "cnfg") >= 0)
+		return dev_ofnode(dev);
+
+	dev_for_each_subnode(node, dev) {
+		if (ofnode_name_eq(node, "spmi"))
+			return node;
+	}
+
+	return dev_ofnode(dev);
+}
+
+static fdt_addr_t msm_spmi_bus_addr(ofnode node, const char *name)
+{
+	int idx = ofnode_stringlist_search(node, "reg-names", name);
+
+	if (idx < 0)
+		return FDT_ADDR_T_NONE;
+
+	return ofnode_get_addr_index(node, idx);
+}
+
+/*
+ * The PMICs sit below the "spmi" bus child, which has no driver of its
+ * own, so the uclass post_bind (dm_scan_fdt_dev) never reaches them.
+ * Bind them directly under the arbiter, which is where the PMIC and SDAM
+ * drivers expect to find their SPMI controller (dev->parent).
+ */
+static int msm_spmi_bind(struct udevice *dev)
+{
+	ofnode bus, pmic;
+
+	bus = msm_spmi_bus_node(dev);
+	if (ofnode_equal(bus, dev_ofnode(dev)))
+		return 0;
+
+	ofnode_for_each_subnode(pmic, bus) {
+		int ret = lists_bind_fdt(dev, pmic, NULL, NULL, false);
+
+		if (ret && ret != -ENODEV)
+			dev_dbg(dev, "bind %s failed: %d\n",
+				ofnode_get_name(pmic), ret);
+	}
+
+	return 0;
+}
+
 static int msm_spmi_probe(struct udevice *dev)
 {
 	struct msm_spmi_priv *priv = dev_get_priv(dev);
+	ofnode bus = msm_spmi_bus_node(dev);
 	phys_addr_t core_addr;
 	u32 hw_ver;
 	int i;
@@ -407,7 +466,7 @@ static int msm_spmi_probe(struct udevice *dev)
 		priv->max_channels = min_t(u32, readl(core_addr + PMIC_ARB_FEATURES) &
 						PMIC_ARB_FEATURES_PERIPH_MASK,
 					   SPMI_MAX_CHANNELS_V5);
-		priv->spmi_cnfg = dev_read_addr_name(dev, "cnfg");
+		priv->spmi_cnfg = msm_spmi_bus_addr(bus, "cnfg");
 	} else if (hw_ver < PMIC_ARB_VERSION_V8_MIN) {
 		/* TOFIX: handle second bus */
 		priv->arb_ver = V7;
@@ -415,7 +474,7 @@ static int msm_spmi_probe(struct udevice *dev)
 		priv->max_channels = min_t(u32, readl(core_addr + PMIC_ARB_FEATURES) &
 						PMIC_ARB_FEATURES_PERIPH_MASK,
 					   SPMI_MAX_CHANNELS_V7);
-		priv->spmi_cnfg = dev_read_addr_name(dev, "cnfg");
+		priv->spmi_cnfg = msm_spmi_bus_addr(bus, "cnfg");
 	} else {
 		/*
 		 * v8. Before this case existed, v8 fell into the V7 branch
@@ -443,9 +502,9 @@ static int msm_spmi_probe(struct udevice *dev)
 		 */
 		priv->arb_chnl = dev_read_addr_name(dev, "chnl_map");
 		priv->max_channels = SPMI_MAX_CHANNELS_V7;
-		priv->spmi_cnfg = dev_read_addr_name(dev, "cnfg");
+		priv->spmi_cnfg = msm_spmi_bus_addr(bus, "cnfg");
 		/* v8 keeps ownership in its own region, not in "cnfg". */
-		priv->apid_owner = dev_read_addr_name(dev, "chnl_owner");
+		priv->apid_owner = msm_spmi_bus_addr(bus, "chnl_owner");
 		if (priv->apid_owner == FDT_ADDR_T_NONE) {
 			printf("spmi: v8 requires a \"chnl_owner\" reg region\n");
 			return -EINVAL;
@@ -532,6 +591,7 @@ U_BOOT_DRIVER(msm_spmi) = {
 	.name = "msm_spmi",
 	.id = UCLASS_SPMI,
 	.of_match = msm_spmi_ids,
+	.bind = msm_spmi_bind,
 	.ops = &msm_spmi_ops,
 	.probe = msm_spmi_probe,
 	.priv_auto = sizeof(struct msm_spmi_priv),
