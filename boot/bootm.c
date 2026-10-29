@@ -23,6 +23,7 @@
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/unaligned.h>
 #include <linux/sizes.h>
 #include <tpm-v2.h>
 #include <tpm_tcg2.h>
@@ -638,6 +639,81 @@ static int handle_decomp_error(int comp_type, size_t uncomp_size,
 #endif
 
 #ifndef USE_HOSTCC
+/**
+ * bootm_arm64_avoid_blob() - keep the arm64 kernel move clear of the FIT blob
+ *
+ * booti_setup() places an arm64 Image at the next 2MiB boundary (plus
+ * text_offset) after where it currently sits. For an uncompressed
+ * IH_TYPE_KERNEL_NOLOAD kernel that still lives inside the loaded FIT, that
+ * destination is inside the FIT too, so the memmove() overwrites the
+ * ramdisk and FDT sub-images that have not been consumed yet.
+ *
+ * If the destination overlaps the blob, pick a 2MiB-aligned LMB region
+ * instead. This is only valid when bit 3 of the Image header flags is set,
+ * which says the 2MiB-aligned base may be anywhere in physical memory;
+ * otherwise the destination is fixed by the arm64 boot protocol and is left
+ * alone.
+ *
+ * @image:		Current (source) address of the Image
+ * @relocated_addr:	Destination chosen by booti_setup(); updated if moved
+ * @image_size:		Image size from the Image header
+ * @blob_start:		Start of the container the Image was loaded from
+ * @blob_end:		End of the container the Image was loaded from
+ * Return: 0 on success, -ve on error
+ */
+static int bootm_arm64_avoid_blob(const void *image, ulong *relocated_addr,
+				  ulong image_size, ulong blob_start,
+				  ulong blob_end)
+{
+	/* Image header: flags is the u64 at offset 24 */
+	const u64 flags = get_unaligned_le64(image + 24);
+	ulong dest = *relocated_addr;
+	/* text_offset is always below 2MiB, so it is the low bits of dest */
+	ulong text_offset = dest & (SZ_2M - 1);
+	phys_addr_t blob = blob_start;
+	phys_size_t blob_len = blob_end - blob_start;
+	phys_addr_t addr;
+	bool reserved;
+	int err;
+
+	if (dest >= blob_end || dest + image_size <= blob_start)
+		return 0;
+
+	if (!(flags & BIT(3)))
+		return 0;
+
+	/*
+	 * The blob is not necessarily reserved in LMB, so hold it while
+	 * allocating, then drop it again: later states reserve the images
+	 * in place and would fail if it stayed reserved.
+	 */
+	reserved = !lmb_alloc_mem(LMB_MEM_ALLOC_ADDR, 0, &blob, blob_len,
+				  LMB_NONE);
+
+	err = lmb_alloc_mem(LMB_MEM_ALLOC_ANY, SZ_2M, &addr,
+			    text_offset + image_size, LMB_NONE);
+
+	if (reserved)
+		lmb_free(blob_start, blob_len, LMB_NONE);
+
+	if (err) {
+		printf("Unable to allocate %#lx bytes to move the kernel clear of its FIT\n",
+		       text_offset + image_size);
+		return err;
+	}
+
+	if (addr + text_offset < blob_end &&
+	    addr + text_offset + image_size > blob_start) {
+		lmb_free(addr, text_offset + image_size, LMB_NONE);
+		printf("Unable to find kernel memory clear of its FIT\n");
+		return -ENOMEM;
+	}
+
+	*relocated_addr = addr + text_offset;
+
+	return 0;
+}
+
 static int bootm_load_os(struct bootm_headers *images, int boot_progress)
 {
 	const struct image_info os = images->os;
@@ -733,6 +809,12 @@ static int bootm_load_os(struct bootm_headers *images, int boot_progress)
 
 		/* Handle BOOTM_STATE_LOADOS */
 		if (relocated_addr != load) {
+			ret = bootm_arm64_avoid_blob(load_buf, &relocated_addr,
+						     image_size, blob_start,
+						     blob_end);
+			if (ret)
+				return BOOTM_ERR_RESET;
+
 			printf("Moving Image from 0x%lx to 0x%lx, end=0x%lx\n",
 			       load, relocated_addr,
 			       relocated_addr + image_size);
